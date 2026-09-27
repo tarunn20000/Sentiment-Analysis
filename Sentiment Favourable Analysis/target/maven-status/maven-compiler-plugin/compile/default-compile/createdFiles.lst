@@ -1,0 +1,8 @@
+com\sentiment\Features.class
+com\sentiment\Evaluate.class
+com\sentiment\App$MovieReview.class
+com\sentiment\Model.class
+com\sentiment\FavorabilityScore.class
+com\sentiment\Preprocessing$PorterStemmer.class
+com\sentiment\App.class
+com\sentiment\Preprocessing.class

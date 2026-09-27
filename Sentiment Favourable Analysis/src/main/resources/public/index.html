@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment & Favorability Dashboard</title>
+    <!-- Outfit Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Tesseract.js for Client-Side OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- Face-API.js for Client-Side Face Expression Analysis -->
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1 class="main-title">Sentiment & Favorability Analyzer</h1>
+            <p class="subtitle">A continuous -1.0 (unfavorable) to +1.0 (favorable) scoring system for text reviews</p>
+        </header>
+
+        <!-- Live Camera Panel (standalone, outside the input card) -->
+        <div class="camera-panel" id="camera-section">
+            <div class="camera-container">
+                <video id="webcam" autoplay muted playsinline></video>
+                <canvas id="camera-overlay"></canvas>
+                <div id="camera-placeholder" class="camera-placeholder">
+                    <span class="camera-placeholder-icon">🎥</span>
+                    <p id="camera-placeholder-text">Camera Offline</p>
+                </div>
+            </div>
+            <div class="camera-controls">
+                <button id="camera-toggle-btn" type="button">Start Camera</button>
+            </div>
+        </div>
+
+        <!-- Main Content Area (shifts right when camera is active) -->
+        <div class="main-content">
+
+        <!-- Main Input Section -->
+        <section class="card input-section">
+            <h2>📝 Analyze Custom Review</h2>
+            <div class="input-container">
+                <div class="text-input-panel">
+                    <textarea id="review-input" placeholder="Type your review here..."></textarea>
+                </div>
+                <div class="ocr-upload-panel">
+                    <div id="ocr-dropzone" class="ocr-dropzone">
+                        <div class="dropzone-content">
+                            <span class="upload-icon">📄</span>
+                            <p class="dropzone-text">Drag & drop review image, or <span class="browse-link">browse</span></p>
+                            <span class="dropzone-subtext">Extracts review text using AI OCR</span>
+                        </div>
+                        <input type="file" id="image-upload" accept="image/*" style="display: none;">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Progress Overlay for OCR -->
+            <div id="ocr-progress-overlay" class="ocr-progress-overlay" style="display: none;">
+                <div class="ocr-progress-card">
+                    <div class="spinner"></div>
+                    <p id="ocr-status">Initializing OCR Engine...</p>
+                    <div class="progress-bar-container">
+                        <div id="ocr-progress-bar" class="progress-bar"></div>
+                    </div>
+                    <span id="ocr-percentage">0%</span>
+                </div>
+            </div>
+            
+            <div class="settings-bar">
+                <div class="slider-container">
+                    <label for="temp-slider">Temperature Calibration (T): <span id="temp-val">1.0</span></label>
+                    <input type="range" id="temp-slider" min="0.2" max="3.0" value="1.0" step="0.1">
+                    <span class="tooltip">T > 1.0 smooths probabilities, T < 1.0 accentuates extremes</span>
+                </div>
+                <button id="analyze-btn">Calculate Favorability</button>
+            </div>
+        </section>
+
+        <!-- Results Grid -->
+        <section class="results-grid">
+            <!-- Unified Multimodal Favorability Card -->
+            <div class="card unified-card">
+                <div class="unified-header">
+                    <h3>🏆 Unified Multimodal Favorability</h3>
+                    <div class="unified-badges">
+                        <span id="unified-text-weight" class="badge-weight">Text Weight: 100%</span>
+                        <span id="unified-face-weight" class="badge-weight" style="display: none;">Face Weight: 0%</span>
+                    </div>
+                </div>
+                <div class="unified-details">
+                    <div class="unified-main-row">
+                        <div class="unified-score-container">
+                            <span id="unified-label" class="label-badge">-</span>
+                            <div id="unified-score" class="metric-value">+0.000</div>
+                        </div>
+                        <div class="unified-gauge-container">
+                            <div class="gauge-bg">
+                                <div id="unified-gauge-fill-pos" class="gauge-fill-pos"></div>
+                                <div id="unified-gauge-fill-neg" class="gauge-fill-neg"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="unified-caption">Fuses textual model sentiment with real-time live webcam facial expression tracking</p>
+                </div>
+            </div>
+
+            <!-- Logistic Regression Baseline -->
+            <div class="card result-card">
+                <h3>📊 Logistic Regression Baseline</h3>
+                <div class="result-details">
+                    <p class="sentiment-label">Sentiment: <span id="lr-label" class="label-badge">-</span></p>
+                    <div id="lr-score" class="metric-value">+0.000</div>
+                    <div class="gauge-container">
+                        <div class="gauge-bg">
+                            <div id="lr-gauge-fill-pos" class="gauge-fill-pos"></div>
+                            <div id="lr-gauge-fill-neg" class="gauge-fill-neg"></div>
+                        </div>
+                    </div>
+                    <p class="raw-prob">Raw Model Probability: <span id="lr-prob">0.0%</span></p>
+                </div>
+            </div>
+
+            <!-- DistilBERT Transformer Model -->
+            <div class="card result-card">
+                <h3>🧠 DistilBERT Transformer Model</h3>
+                <div class="result-details">
+                    <p class="sentiment-label">Sentiment: <span id="db-label" class="label-badge">-</span></p>
+                    <div id="db-score" class="metric-value">+0.000</div>
+                    <div class="gauge-container">
+                        <div class="gauge-bg">
+                            <div id="db-gauge-fill-pos" class="gauge-fill-pos"></div>
+                            <div id="db-gauge-fill-neg" class="gauge-fill-neg"></div>
+                        </div>
+                    </div>
+                    <p class="raw-prob">Raw Model Probability: <span id="db-prob">0.0%</span></p>
+                </div>
+            </div>
+
+            <!-- Live Facial Expression Analysis -->
+            <div class="card result-card">
+                <h3>📷 Live Facial Expression</h3>
+                <div class="result-details">
+                    <p class="sentiment-label">Expression: <span id="face-label" class="label-badge">-</span></p>
+                    <div id="face-score" class="metric-value">+0.000</div>
+                    <div class="gauge-container">
+                        <div class="gauge-bg">
+                            <div id="face-gauge-fill-pos" class="gauge-fill-pos"></div>
+                            <div id="face-gauge-fill-neg" class="gauge-fill-neg"></div>
+                        </div>
+                    </div>
+                    <p class="raw-prob">Dominant Confidence: <span id="face-prob">0.0%</span></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Insights and Explainability Grid -->
+        <section class="insights-grid">
+            <!-- Word contributions (explainability) -->
+            <div class="card explain-card">
+                <h3>🔍 Word Contribution Impact</h3>
+                <p class="card-caption">Indicates how individual words shifted the favorability score</p>
+                <div class="chart-container">
+                    <canvas id="impact-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Word Cloud and Trend analysis -->
+            <div class="card trend-card">
+                <h3>📈 Sentiment Trend & Word Frequency</h3>
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('trend-tab')">Rolling Trend</button>
+                    <button class="tab-btn" onclick="switchTab('cloud-tab')">Word Cloud</button>
+                </div>
+
+                <div id="trend-tab" class="tab-content active">
+                    <div class="chart-container">
+                        <canvas id="trend-chart"></canvas>
+                    </div>
+                </div>
+
+                <div id="cloud-tab" class="tab-content">
+                    <div id="wordcloud-container" class="wordcloud-container">
+                        <!-- Word cloud words will be injected here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+        </div> <!-- end .main-content -->
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
